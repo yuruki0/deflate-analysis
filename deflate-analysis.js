@@ -1,21 +1,21 @@
 // This script is made with the sole purpose of analyzing the dynamic Huffman
 // code of a DEFLATE-compressed file.
 
-// How many bits to skip ahead
+const { open } = require('node:fs/promises');
+
 const FILESTART = 19;
 
 
-const { open } = require('node:fs/promises');
-
+// Util functions
 // Reverse a string
 const rev = (s) => { return s.split('').reverse().join(''); };
 // Reverse and parse a binary number string
 const revParse = (s) => { return parseInt(rev(s), 2) };
-
+// Announce values being set
 let vals = {};
 const get = (i) => { return vals[i] };
 const set = (i, val) => {
-    console.log(i + ": " + val);
+    console.log(i + ": " + JSON.stringify(val));
     vals[i] = val;
 };
 
@@ -26,7 +26,6 @@ const set = (i, val) => {
 // https://www.rfc-editor.org/rfc/rfc1951
 const generateHuffmanCodes = (vals, lens) => {
     let tree = [[], []];
-    let codes = {};
 
     const maxBits = lens.reduce((a, b) => Math.max(a, b), -1);
 
@@ -41,7 +40,7 @@ const generateHuffmanCodes = (vals, lens) => {
     let minCodes = [0];
     code = 0; 
     for (let bits = 1; bits <= maxBits; bits++) {
-        code = (code + code[bits - 1]) * 2;
+        code = (code + lenCounts[bits - 1]) * 2;
         minCodes.push(code);
     }
 
@@ -64,8 +63,8 @@ const generateHuffmanCodes = (vals, lens) => {
         let current = tree;
         let bit = 0;
         while (bit < nav.length - 1) {
+            while (current[nav[bit]].length < 2) current[nav[bit]].push([]);
             current = current[nav[bit]];
-            while (current.length < 2) current.push([]);
             bit++;
         }
         current[nav[bit]] = val;
@@ -74,18 +73,18 @@ const generateHuffmanCodes = (vals, lens) => {
     for (let len = 1; len < lenCounts.length; len++) {
         let code = minCodes[len];
         for (let i = 0; i < vals.length; i++) {
-            if (lens[val] == len) {
+            if (lens[i] == len) {
                 let nav = parseCode(code, len);
                 setValue(nav, vals[i]);
-                codes[vals[i]] = nav;
                 code++;
             }
         }
     }
 
-    return { tree, codes };
+    return tree;
 
 };
+
 
 (async () => {
     const bitsFile = await open('./raw-deflate.reversebits.xxd');
@@ -103,13 +102,43 @@ const generateHuffmanCodes = (vals, lens) => {
 
     // Index is code length code in alphabet, value is that code length's code length T_T
     vals.clLengths = [];
+    vals.cl = [];
 
-    for (let i = 0; i < 19; i++)
+    for (let i = 0; i < 19; i++) {
         get('clLengths').push(0);
+        get('cl').push(i);
+    }
 
     for (let i = 0; i < get('HCLEN') + 4; i++) {
         get('clLengths')[clOrder[i]] = parseBits(3);
     }
 
     set('clLengths', get('clLengths'));
+    set('cl', get('cl'));
+    set('clCodes', generateHuffmanCodes(get('cl'), get('clLengths')));
+
+    // Read literal lengths
+    let litLengths = [];
+    let lit = [];
+    while (litLengths.length < 285) {
+        let code = get('clCodes');
+        while (Array.isArray(code)) {
+            code = code[parseBits(1)];
+        }
+        if (code < 16) {
+            litLengths.push(code);
+        } else if (code == 16) {
+            let repeat = parseBits(2);
+            let lastLitLength = litLengths[litLengths.length - 1];
+            for (let i = 0; i < repeat + 3; i++)
+                litLengths.push(lastLitLength);
+        } else if (code == 17) {
+            let repeat = parseBits(3);
+            for (let i = 0; i < repeat + 3; i++) {
+                litLengths.push(lastLit
+            }
+        }
+    }
+    console.log("Generated " + litLengths.length + "literal/length code lengths");
+
 })();
