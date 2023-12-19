@@ -12,11 +12,9 @@ const rev = (s) => { return s.split('').reverse().join(''); };
 // Reverse and parse a binary number string
 const revParse = (s) => { return parseInt(rev(s), 2) };
 // Announce values being set
-let vals = {};
-const get = (i) => { return vals[i] };
-const set = (i, val) => {
-    console.log(i + ": " + JSON.stringify(val));
-    vals[i] = val;
+const announce = (name, val) => {
+    console.log(name + ": " + JSON.stringify(val));
+    return val;
 };
 
 // Takes a list of a ordered values and another list of their respective
@@ -75,6 +73,7 @@ const generateHuffmanCodes = (vals, lens) => {
         for (let i = 0; i < vals.length; i++) {
             if (lens[i] == len) {
                 let nav = parseCode(code, len);
+                console.log("Code " + vals[i] + " = " + JSON.stringify(nav));
                 setValue(nav, vals[i]);
                 code++;
             }
@@ -92,53 +91,116 @@ const generateHuffmanCodes = (vals, lens) => {
 
     await new Promise(res => bits.once('readable', () => res() ));
 
-    const parseBits = (i) => { return revParse(bits.read(i)); };
+    let bitsReadCount = FILESTART;
+    const read = (i) => { bitsReadCount += i; return bits.read(i); };
+    const parseBits = (i) => { return revParse(read(i)); };
     
-    set('HLIT', parseBits(5));
-    set('HDIST', parseBits(5));
-    set('HCLEN', parseBits(4));
+    let HLIT = announce('HLIT', parseBits(5));
+    let HDIST = announce('HDIST', parseBits(5));
+    let HCLEN = announce('HCLEN', parseBits(4));
 
     const clOrder = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
 
     // Index is code length code in alphabet, value is that code length's code length T_T
-    vals.clLengths = [];
-    vals.cl = [];
+    let clLengths = [];
+    let cl = [];
 
     for (let i = 0; i < 19; i++) {
-        get('clLengths').push(0);
-        get('cl').push(i);
+        clLengths.push(0);
+        cl.push(i);
     }
 
-    for (let i = 0; i < get('HCLEN') + 4; i++) {
-        get('clLengths')[clOrder[i]] = parseBits(3);
+    for (let i = 0; i < HCLEN + 4; i++) {
+        clLengths[clOrder[i]] = parseBits(3);
     }
 
-    set('clLengths', get('clLengths'));
-    set('cl', get('cl'));
-    set('clCodes', generateHuffmanCodes(get('cl'), get('clLengths')));
+    announce('clLengths', clLengths);
+    announce('cl', cl);
+    let clCodes = announce('clCodes', generateHuffmanCodes(cl, clLengths));
 
-    // Read literal lengths
-    let litLengths = [];
-    let lit = [];
-    while (litLengths.length < 285) {
-        let code = get('clCodes');
-        while (Array.isArray(code)) {
-            code = code[parseBits(1)];
-        }
-        if (code < 16) {
-            litLengths.push(code);
-        } else if (code == 16) {
-            let repeat = parseBits(2);
-            let lastLitLength = litLengths[litLengths.length - 1];
-            for (let i = 0; i < repeat + 3; i++)
-                litLengths.push(lastLitLength);
-        } else if (code == 17) {
-            let repeat = parseBits(3);
-            for (let i = 0; i < repeat + 3; i++) {
-                litLengths.push(lastLit
+    // Utility function for reading lengths using length codes
+    const readLengths = (count) => {
+        let litLengths = [];
+        let lit = [-1];
+        while (litLengths.length < count) {
+            let code = clCodes;
+            while (Array.isArray(code)) {
+                code = code[parseBits(1)];
+            }
+            if (code < 16) {
+                litLengths.push(code);
+                lit.push(lit[lit.length - 1] + 1);
+            } else if (code == 16) {
+                let repeat = parseBits(2);
+                let lastLitLength = litLengths[litLengths.length - 1];
+                for (let i = 0; i < repeat + 3; i++) {
+                    litLengths.push(lastLitLength);
+                    lit.push(lit[lit.length - 1] + 1);
+                }
+            } else if (code == 17) {
+                let repeat = parseBits(3);
+                for (let i = 0; i < repeat + 3; i++) {
+                    litLengths.push(0);
+                    lit.push(lit[lit.length - 1] + 1);
+                }
+            } else {
+                let repeat = parseBits(7);
+                for (let i = 0; i < repeat + 11; i++) {
+                    litLengths.push(0);
+                    lit.push(lit[lit.length - 1] + 1);
+                }
             }
         }
+        lit.shift();
+        return {lit, litLengths};
+    };
+
+    console.log();
+    let litRead = readLengths(HLIT + 257);
+    let litLengths = announce('litLengths', litRead.litLengths);
+    let lit = announce('lit', litRead.lit);
+    let litCodes = announce('litCodes', generateHuffmanCodes(lit, litLengths));
+    console.log("\nExpected " + JSON.stringify(HLIT + 257) + " literal/length code lengths");
+    console.log("Generated " + litLengths.length + " literal/length code lengths\n");
+
+    let distRead = readLengths(HDIST + 1);
+    let distLengths = announce('distLengths', distRead.litLengths);
+    let dist = announce('dist', distRead.lit);
+    let distCodes = announce('distCodes', generateHuffmanCodes(dist, distLengths));
+    console.log("Expected " + JSON.stringify(HDIST + 1) + " distance code lengths");
+    console.log("Generated " + distLengths.length + " distance code lengths\n");
+
+    console.log("Now reading codes until a non-literal code is found.");
+
+    let code = 0;
+    let bitsRead = "";
+    while (code < 256) {
+        let currentCode = litCodes;
+        while (Array.isArray(currentCode)) {
+            let bit = read(1);
+            currentCode = currentCode[revParse(bit)];
+            bitsRead += bit;
+        }
+        console.log("Code " + currentCode);
+        code = currentCode;
     }
-    console.log("Generated " + litLengths.length + "literal/length code lengths");
+    console.log("Stopped: found non-literal code.");
+    console.log("Currently at hex address " + Math.floor(bitsReadCount / 8).toString(16) +
+        " (+ " + bitsReadCount%8 + " bits) (bit address " + bitsReadCount + ")");
+    console.log("Printing read bytes.");
+    console.log(bitsRead);
+
+    const printNextBits = (i) => {
+        console.log("Printing next " + JSON.stringify(i) + " bits.");
+        console.log("Currently at hex address " + Math.floor(bitsReadCount / 8).toString(16) +
+            " (+ " + bitsReadCount%8 + " bits) (bit address " + bitsReadCount + ")");
+        console.log(read(i));
+    }
+    printNextBits(64 - 9 + 8);
+    printNextBits(80);
+    printNextBits(80);
+    printNextBits(80);
+    if (code == 285) {
+    }
 
 })();
