@@ -27,6 +27,8 @@ const { open } = require('node:fs/promises');
     const read = () => readBytes(1);
 
     console.log("Finding pattern: " + pattern);
+    let firstBytePattern = pattern.charAt(0);
     let currentByte = read(1);
+    while (currentBytes != pattern
 
 })();

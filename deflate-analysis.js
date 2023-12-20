@@ -1,21 +1,9 @@
-// This script is made with the sole purpose of analyzing the dynamic Huffman
-// code of a DEFLATE-compressed file.
-
-const { open } = require('node:fs/promises');
+import { open } from 'node:fs/promises';
 
 const FILESTART = 19;
 
 
 // Util functions
-// Reverse a string
-const rev = (s) => { return s.split('').reverse().join(''); };
-// Reverse and parse a binary number string
-const revParse = (s) => { return parseInt(rev(s), 2) };
-// Announce values being set
-const announce = (name, val) => {
-    console.log(name + ": " + JSON.stringify(val));
-    return val;
-};
 
 // Takes a list of a ordered values and another list of their respective
 // bit lengths, and generates a tree of codes that navigate to their values
