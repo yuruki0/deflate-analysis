@@ -2,16 +2,21 @@
 
 import { open } from 'node:fs/promises';
 
+import { parseReverseBits } from './bitmath.js';
+
 export class BitReader {
     #bytes;
     #readable = false;
     #currentByte = [];
+    #readCount = 0;
     constructor(bytes) {
         this.#bytes = bytes;
         this.#readable = true;
 
         this.read = this.#read;
         this.parseNumber = this.#parseNumber;
+        this.getBitsReadCount = () => this.#readCount;
+        this.next = () => this.read()[0];
 
         bytes.once('end', () => {
             this.#readable = false;
@@ -33,10 +38,11 @@ export class BitReader {
             if (!Number.isInteger(n)) throw new Error('Cannot read \'' +
                 JSON.stringify(n) + '\' bits: not an integer');
             let bits = [];
-            while (bits.length < n) bits.push(this.read());
+            while (bits.length < n) bits.push(this.read()[0]);
             return bits;
         }
         if (this.#currentByte.length == 0) this.#getByte();
+        this.#readCount++;
         return [this.#currentByte.shift()];
     }
     #parseNumber(len) {
@@ -44,11 +50,7 @@ export class BitReader {
             'Cannot parse \'' + JSON.stringify(n) + '\' bits: must be an ' +
             'integer greater than 0');
         let bits = this.read(len);
-        let num = 0;
-        for (let i = 0; i < len; i++) {
-            num += bits[i] << i
-        }
-        return num;
+        return parseReverseBits(bits);
     }
 }
 

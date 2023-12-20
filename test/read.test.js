@@ -17,6 +17,7 @@ for (let i = 0; i < testString.length; i++) {
 }
 
 console.log('Finished copying and reading bytes.');
+console.log('Read ' + br.getBitsReadCount() / 8 + ' bytes.');
 if (bytesRead == testString)
     console.log('Test completed successfully.');
 else {
