@@ -22,6 +22,7 @@ export class BitReader {
             this.#readable = false;
         });
     }
+    isReadable() { return this.#readable; }
     #getByte() {
         if (!this.#readable) throw new Error('No more bytes to be read from' +
             this.#bytes.path);

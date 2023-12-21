@@ -24,16 +24,20 @@ const HEIGHT = 1240;
     let bytesCreated = 0;
     let code;
     do {
-        console.log("At address " +
+        let addressLog = "At address " +
             Math.floor(bits.getBitsReadCount() / 8).toString(16).toUpperCase() +
             " (+ " +
             JSON.stringify(bits.getBitsReadCount() % 8) +
-            " bits)"
-        );
+            " bits)";
         code = parseDataCode(codes, bits.next, lenDistKey);
         if (code.type == 'literal') bytesCreated++;
         else if (code.type == 'repeat') bytesCreated += code.length;
-        console.log(code);
+
+        if (code.type == 'literal') {
+            console.log(addressLog);
+            console.log(code);
+        }
+
         i++;
     } while (code.type !== 'end');
     // } while (i < 20);
