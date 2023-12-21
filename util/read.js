@@ -52,6 +52,7 @@ export class BitReader {
         let bits = this.read(len);
         return parseReverseBits(bits);
     }
+    close() {}
 }
 
 export const createBitReader = async (file) => {
@@ -67,5 +68,12 @@ export const createBitReader = async (file) => {
     }
 
     return br;
+}
+
+
+export const readJSONFromFile = async (file) => {
+    let fileHandler = await open(file);
+    let raw = await fileHandler.readFile('utf8');
+    return JSON.parse(raw);
 }
 

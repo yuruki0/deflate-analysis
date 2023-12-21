@@ -11,13 +11,17 @@ export const parseReverseBits = (bits) => {
         num += bits[i] << i
     }
     return num;
-};
+}
 
 // Creates a function that will parse a number of bits from a next() function
 export const nextBitsGenerator = (next) => {
     return (n) => {
-        let bits = [];
-        for (; n > 0; n--) bits.push(next());
-        return parseReverseBits(bits);
+        return parseNextBits(n, next);
     };
+}
+
+export const parseNextBits = (n, next) => {
+    let bits = [];
+    for (; n > 0; n--) bits.push(next());
+    return parseReverseBits(bits);
 }
